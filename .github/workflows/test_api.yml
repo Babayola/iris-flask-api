@@ -2,26 +2,29 @@ name: Test Iris API
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  test:
+  test-api:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      - name: Wait for deployment to be ready
+        run: |
+          for i in {1..10}; do
+            if curl --silent --fail https://iris-project.fly.dev/predict; then
+              echo "API is up!"
+              break
+            fi
+            echo "Waiting for API to be ready... ($i/10)"
+            sleep 5
+          done
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-
-    - name: Install dependencies
-      run: |
-        pip install requests
-
-    - name: Run API test
-      run: python test_api.py
+      - name: Test prediction API
+        run: |
+          response=$(curl -s -X POST https://iris-project.fly.dev/predict \
+            -H "Content-Type: application/json" \
+            -d '{"Input": [5.1, 3.5, 1.4, 0.2]}')
+          echo "Response: $response"
+          echo "$response" | grep -q '"prediction":'
